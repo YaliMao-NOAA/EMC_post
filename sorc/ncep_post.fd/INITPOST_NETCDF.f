@@ -113,6 +113,7 @@
       integer            :: Status, fldsize, fldst, recn, recn_vvel
       character             startdate*19,SysDepInfo*80,cgar*1
       character             startdate2(19)*4
+      logical            :: read_lonlat=.true.
 ! 
 !     NOTE: SOME INTEGER VARIABLES ARE READ INTO DUMMY ( A REAL ). THIS IS OK
 !     AS LONG AS REALS AND INTEGERS ARE THE SAME SIZE.
@@ -120,7 +121,7 @@
 !     ALSO, EXTRACT IS CALLED WITH DUMMY ( A REAL ) EVEN WHEN THE NUMBERS ARE
 !     INTEGERS - THIS IS OK AS LONG AS INTEGERS AND REALS ARE THE SAME SIZE.
       LOGICAL RUNB,SINGLRST,SUBPOST,NEST,HYDRO,IOOMG,IOALL
-      logical, parameter :: debugprint = .true., zerout = .false.
+      logical, parameter :: debugprint = .false., zerout = .false.
 !     logical, parameter :: debugprint = .true.,  zerout = .false.
       logical :: convert_rad_to_deg=.false.
       CHARACTER*32 varcharval 
@@ -518,10 +519,28 @@
       end if
  101  format(T13,i4,1x,i2,1x,i2,1x,i2,1x,i2)
       print*,'idate= ',idate(1:5)
-! get longitude 
+
+! Jili Dong check output format for coordinate reading
       Status=nf90_inq_varid(ncid3d,'grid_xt',varid)
       Status=nf90_inquire_variable(ncid3d,varid,ndims = numDims)
-      if(debugprint)print*,'number of dim for gdlon ',numDims
+      if(numDims==1) then
+        read_lonlat=.true.
+      else
+        read_lonlat=.false.
+      end if
+      
+
+! Jili Dong add support for new write component output
+! get longitude 
+      if (read_lonlat) then
+        Status=nf90_inq_varid(ncid3d,'lon',varid)
+        Status=nf90_inquire_variable(ncid3d,varid,ndims = numDims)
+        if(debugprint)print*,'number of dim for gdlon ',numDims
+      else
+        Status=nf90_inq_varid(ncid3d,'grid_xt',varid)
+        Status=nf90_inquire_variable(ncid3d,varid,ndims = numDims)
+        if(debugprint)print*,'number of dim for gdlon ',numDims
+      end if
       if(numDims==1)then
         Status=nf90_get_var(ncid3d,varid,glon1d)  
         do j=jsta,jend
@@ -531,6 +550,18 @@
         end do
         lonstart = nint(glon1d(1)*gdsdegr)
         lonlast  = nint(glon1d(im)*gdsdegr)
+
+! Jili Dong add support for regular lat lon (2019/03/22) start
+       if (MAPTYPE .eq. 0) then
+        if(lonstart<0.)then
+         lonstart=lonstart+360.*gdsdegr
+        end if
+        if(lonlast<0.)then
+         lonlast=lonlast+360.*gdsdegr
+        end if
+       end if
+! Jili Dong add support for regular lat lon (2019/03/22) end 
+
       else if(numDims==2)then
         Status=nf90_get_var(ncid3d,varid,dummy)
         if(maxval(abs(dummy))<2.0*pi)convert_rad_to_deg=.true. 
@@ -568,10 +599,17 @@
 
       end if
       print*,'lonstart,lonlast ',lonstart,lonlast 
+! Jili Dong add support for new write component output
 ! get latitude
-      Status=nf90_inq_varid(ncid3d,'grid_yt',varid)
-      Status=nf90_inquire_variable(ncid3d,varid,ndims = numDims)
-      if(debugprint)print*,'number of dim for gdlat ',numDims
+      if (read_lonlat) then
+        Status=nf90_inq_varid(ncid3d,'lat',varid)
+        Status=nf90_inquire_variable(ncid3d,varid,ndims = numDims)
+        if(debugprint)print*,'number of dim for gdlat ',numDims
+      else
+        Status=nf90_inq_varid(ncid3d,'grid_yt',varid)
+        Status=nf90_inquire_variable(ncid3d,varid,ndims = numDims)
+        if(debugprint)print*,'number of dim for gdlat ',numDims
+      end if
       if(numDims==1)then
         Status=nf90_get_var(ncid3d,varid,glat1d)
         do j=jsta,jend
@@ -2795,8 +2833,9 @@
 !        iret = nf90_get_var(ncid,varid,dummy2,start=(/1,1,l,ifhr/), &
 !             count=(/im,jm,1,1/))
         if (iret /= 0) then
-          print*,VarName,l," not found -Assigned missing values"
+          print*,VarName," not found -Assigned missing values"
           do l=1,lm
+!$omp parallel do private(i,j)
           do j=1,jm
             do i=1,im
               dummy(i,j,l) = spval
@@ -2805,6 +2844,7 @@
           end do
         else
           do l=1,lm
+!$omp parallel do private(i,j,jj)
           do j=1,jm
 !            jj=jm-j+1
             jj=j
@@ -2850,12 +2890,14 @@
         !     count=(/im,jm,1/))
         if (iret /= 0) then
           print*,VarName, " not found -Assigned missing values"
+!$omp parallel do private(i,j)
           do j=1,jm
             do i=1,im
               dummy(i,j) = spval
             end do
           end do
         else
+!$omp parallel do private(i,j,jj)
           do j=1,jm
 !            jj=jm-j+1
             jj=j
