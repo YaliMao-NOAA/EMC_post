@@ -520,22 +520,20 @@
             deallocate(QTYPE)
          ENDIF
 
-      ENDIF
-
-      ! Relabel the pressure level to reference levels
-      IDS = 0
-      IDS = (/ 450,480,464,465,466,518,519,520,521,522,523,524,525,(I,I=14,50) /)
-      do i = 1, NFDMAX
-         iID=IDS(i)
-         if(iID == 0) exit
-         N = IAVBLFLD(IGET(iID))
-         NFDCTL=size(pset%param(N)%level)
-         do j = 1, NFDCTL
-            pset%param(N)%level(j) = relabel(pset%param(N)%level(j))
+         ! Relabel the pressure level to reference levels
+         IDS = 0
+         IDS = (/ 450,480,464,465,466,518,519,520,521,522,523,524,525,(I,I=14,50) /)
+         do i = 1, NFDMAX
+            iID=IDS(i)
+            if(iID == 0) exit
+            N = IAVBLFLD(IGET(iID))
+            NFDCTL=size(pset%param(N)%level)
+            do j = 1, NFDCTL
+               pset%param(N)%level(j) = relabel(pset%param(N)%level(j))
+            end do
          end do
-      end do
 
-      iID=450
+      ENDIF
 !
 !     END OF ROUTINE.
 !
